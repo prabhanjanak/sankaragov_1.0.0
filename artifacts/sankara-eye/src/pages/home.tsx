@@ -1,159 +1,18 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { BASE_PATH } from "@/lib/constants";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion, AnimatePresence } from "framer-motion";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useSubmitPublicEyeCall, useListPublicUnits } from "@workspace/api-client-react";
-import { INDIA_STATES } from "@/lib/constants";
 import {
   Eye, Clock, Phone, Heart, ArrowRight, ShieldAlert, HeartHandshake,
-  Award, CheckCircle2, BookOpen, Sparkles, Info, Send, AlertCircle,
-  Activity, MapPin, User, Building2, ChevronRight, Star, Users, Download, Share2
+  Award, CheckCircle2, BookOpen, Sparkles, Info, Users, Share2, Download
 } from "lucide-react";
 
-// ─── Validation ──────────────────────────────────────────────────────────────
-const mobileRegex = /^\+91 [6-9]\d{9}$/;
-
-const emergencySchema = z.object({
-  referrerName: z.string().min(2, "Your name is required"),
-  referrerMobile: z.string().regex(mobileRegex, "Enter a valid 10-digit number not starting with 0"),
-  address: z.string().min(5, "Address of eye collection is required"),
-  state: z.string().min(2, "State is required"),
-  district: z.string().min(2, "District is required"),
-  unitId: z.coerce.number().min(1, "Please select the nearest Sankara hospital unit"),
-});
-
-type EmergencyValues = z.infer<typeof emergencySchema>;
-
-// ─── Success overlay ──────────────────────────────────────────────────────────
-function SuccessView({ callId, whatsappUrl, onReset }: { callId: string; whatsappUrl: string; onReset: () => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center gap-6 py-4 text-center"
-    >
-      <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center shadow-inner">
-        <CheckCircle2 className="w-10 h-10 text-green-600" />
-      </div>
-      <div>
-        <h3 className="text-2xl font-extrabold text-gray-900">Emergency Request Logged!</h3>
-        <p className="text-sm text-gray-500 mt-2 max-w-sm">
-          Reference ID: <span className="font-mono font-bold text-gray-800">{callId}</span>. Our coordinator will call you back immediately.
-        </p>
-      </div>
-      <div className="bg-red-50 border border-red-100 rounded-2xl p-4 w-full text-left space-y-2">
-        <h4 className="text-xs font-extrabold text-red-800 uppercase tracking-wide flex items-center gap-1.5">
-          <Activity size={14} className="animate-pulse" /> Urgent Instructions — Do This Now
-        </h4>
-        <ul className="text-[11px] text-red-950 space-y-1 leading-relaxed">
-          <li>• Switch off all ceiling fans in the room immediately.</li>
-          <li>• Gently close the deceased's eyes and place wet cotton over the eyelids.</li>
-          <li>• Turn on AC if available to keep the room cool.</li>
-          <li>• A medical coordinator is preparing to call you back instantly.</li>
-        </ul>
-      </div>
-      <div className="flex flex-col sm:flex-row gap-3 w-full">
-        <Button
-          className="flex-1 h-12 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-2xl font-bold flex items-center justify-center gap-2"
-          onClick={() => window.open(whatsappUrl, "_blank")}
-        >
-          <Phone size={18} /> Ping Coordinator on WhatsApp
-        </Button>
-        <Button
-          variant="outline"
-          className="flex-1 h-12 rounded-2xl border-gray-200 font-semibold"
-          onClick={onReset}
-        >
-          Submit Another
-        </Button>
-      </div>
-    </motion.div>
-  );
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
 export default function Home() {
   const { user } = useAuth();
   const isSignedIn = !!user;
   const [activeSection, setActiveSection] = useState<"guidelines" | "pledge">("guidelines");
-  const [successData, setSuccessData] = useState<{ whatsappUrl: string; callId: string } | null>(null);
-
-  const { data: units } = useListPublicUnits();
-  const submitCall = useSubmitPublicEyeCall();
-
-  const form = useForm<EmergencyValues>({
-    resolver: zodResolver(emergencySchema),
-    defaultValues: {
-      referrerName: "",
-      referrerMobile: "+91 ",
-      address: "",
-      state: "",
-      district: "",
-      unitId: 0,
-    },
-  });
-
-  const selectedState = form.watch("state");
-  const selectedDistrict = form.watch("district");
-
-  const districts = useMemo(() => {
-    const stateObj = INDIA_STATES.find(s => s.name === selectedState);
-    return stateObj ? stateObj.districts : [];
-  }, [selectedState]);
-
-  // Smart filter: only show units whose state matches the selected state
-  const filteredUnits = useMemo(() => {
-    if (!units) return [];
-    if (!selectedState) return units;
-    const stateMatched = units.filter(u => u.state === selectedState);
-    return stateMatched.length > 0 ? stateMatched : units;
-  }, [units, selectedState]);
-
-  const handleMobileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value;
-    if (!val.startsWith("+91 ")) {
-      form.setValue("referrerMobile", "+91 ", { shouldValidate: true });
-      return;
-    }
-    const prefix = "+91 ";
-    let suffix = val.substring(prefix.length).replace(/\D/g, "");
-    if (suffix.startsWith("0")) suffix = suffix.substring(1);
-    form.setValue("referrerMobile", prefix + suffix.substring(0, 10), { shouldValidate: true });
-  };
-
-  const onSubmit = (data: EmergencyValues) => {
-    const selectedUnit = units?.find(u => u.id === data.unitId);
-    const payload = {
-      referrerName: data.referrerName,
-      referrerMobile: data.referrerMobile,
-      referrerRelationship: "Relative / Family",
-      donorName: "Deceased Relative (Emergency Callback)",
-      donorAge: 0,
-      donorGender: "other" as const,
-      timeOfDeath: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) + " (Today)",
-      causeOfDeath: "Not Specified (Emergency Mode)",
-      state: data.state,
-      district: data.district,
-      pincode: "000000",
-      address: data.address,
-      unitId: data.unitId,
-    };
-
-    submitCall.mutate({ data: payload }, {
-      onSuccess: (response) => {
-        setSuccessData({ whatsappUrl: response.whatsappUrl, callId: response.eyeCall.callId });
-        window.open(response.whatsappUrl, "_blank");
-      }
-    });
-  };
 
   return (
     <div className="min-h-screen w-full bg-white font-sans select-none overflow-x-hidden">
@@ -175,286 +34,105 @@ export default function Home() {
               </Button>
             </Link>
           )}
-          <Link href="/donate">
-            <Button size="sm" className="bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] text-white border-0 rounded-xl font-semibold text-xs px-4 shadow-md hover:shadow-lg">
-              Pledge Eyes
-            </Button>
-          </Link>
         </div>
       </header>
 
       {/* ── HERO SECTION ─────────────────────────────────────────────────── */}
-      <section className="relative w-full overflow-hidden bg-gradient-to-br from-[#fff8f2] via-white to-[#fff3e6]">
+      <section className="relative w-full overflow-hidden bg-gradient-to-br from-[#fff8f2] via-white to-[#fff3e6] min-h-[80vh] flex flex-col justify-center">
 
         {/* Decorative blobs */}
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-orange-100 rounded-full blur-[160px] opacity-50 pointer-events-none -z-0" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-yellow-100 rounded-full blur-[120px] opacity-40 pointer-events-none -z-0" />
+        <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-orange-100 rounded-full blur-[160px] opacity-50 pointer-events-none -z-0" />
+        <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-yellow-100 rounded-full blur-[120px] opacity-40 pointer-events-none -z-0" />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-10 pt-12 pb-16 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start">
+        <div className="relative z-10 max-w-5xl mx-auto px-4 md:px-10 pt-16 pb-20 flex flex-col items-center text-center">
 
-          {/* ── LEFT: Hero Copy ─────────────────────────────────────── */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="flex flex-col gap-6"
+            className="flex flex-col items-center gap-8 w-full"
           >
             {/* Urgent Badge */}
-            <div className="inline-flex items-center gap-2 self-start bg-red-600 text-white px-4 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-widest shadow-lg animate-pulse">
-              <ShieldAlert className="h-3.5 w-3.5" />
+            <div className="inline-flex items-center gap-2 bg-red-600 text-white px-5 py-2 rounded-full text-xs sm:text-sm font-extrabold uppercase tracking-widest shadow-lg animate-pulse">
+              <ShieldAlert className="h-4 w-4" />
               Time Critical — Act Within 6 Hours of Death
             </div>
 
-            <div>
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 leading-[1.08] tracking-tight">
+            <div className="space-y-6 max-w-3xl">
+              <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold text-gray-900 leading-[1.08] tracking-tight">
                 Give the
                 <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff7a18] via-[#ff9f43] to-[#ffb347]">
                   Miracle of Sight
                 </span>
               </h1>
-              <p className="mt-5 text-base md:text-lg text-gray-600 leading-relaxed max-w-lg">
-                Every eye donation restores sight to <span className="font-bold text-gray-900">two blind individuals</span>. Fill in the details below to notify our nearest medical team instantly — retrieval must happen within <span className="font-bold text-red-600">6 hours of death</span>.
+              <p className="text-lg md:text-xl text-gray-600 leading-relaxed max-w-2xl mx-auto">
+                Every eye donation restores sight to <span className="font-bold text-gray-900">two blind individuals</span>. 
+                Time is of the essence. Eye retrieval must happen within <span className="font-bold text-red-600">6 hours of death</span>.
               </p>
             </div>
 
+            {/* Helpline */}
+            <div className="flex justify-center my-2">
+              <a href="tel:1919" className="flex items-center gap-4 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-2xl p-4 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer group">
+                <div className="h-11 w-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:rotate-12 transition-transform">
+                  <Phone className="h-6 w-6 animate-pulse" />
+                </div>
+                <div className="text-left">
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-white/80">Emergency Eye Bank Helpline • 24/7</p>
+                  <p className="text-xl font-extrabold tracking-tight">Call Toll-Free: 1919</p>
+                </div>
+              </a>
+            </div>
+
+            {/* Huge CTA Buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 w-full max-w-2xl mt-4">
+              <Link href="/donate?intent=emergency" className="w-full sm:w-1/2">
+                <button className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-red-600 to-red-500 p-[2px] shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
+                  <div className="relative flex flex-col items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-500 rounded-[14px] px-6 py-6 text-white h-full">
+                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300 rounded-[14px]" />
+                    <HeartHandshake className="h-8 w-8 z-10 animate-bounce" />
+                    <div className="text-center z-10">
+                      <p className="text-lg md:text-xl font-extrabold leading-tight">Emergency Donation</p>
+                      <p className="text-xs font-bold text-white/80 mt-1 uppercase tracking-widest">Someone has passed away</p>
+                    </div>
+                  </div>
+                </button>
+              </Link>
+
+              <Link href="/donate?intent=pledge" className="w-full sm:w-1/2">
+                <button className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] p-[2px] shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
+                  <div className="relative flex flex-col items-center justify-center gap-2 bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] rounded-[14px] px-6 py-6 text-white h-full">
+                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300 rounded-[14px]" />
+                    <Award className="h-8 w-8 z-10" />
+                    <div className="text-center z-10">
+                      <p className="text-lg md:text-xl font-extrabold leading-tight">Pledge Your Eyes</p>
+                      <p className="text-xs font-bold text-white/80 mt-1 uppercase tracking-widest">Get your digital certificate</p>
+                    </div>
+                  </div>
+                </button>
+              </Link>
+            </div>
+
             {/* Stats strip */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-6 sm:gap-12 mt-12 w-full max-w-4xl border-t border-gray-200/60 pt-10">
               {[
-                { label: "Sight Restored", value: "2 Lives", icon: <Eye className="h-5 w-5 text-orange-500" /> },
-                { label: "Critical Window", value: "6 Hours", icon: <Clock className="h-5 w-5 text-red-500" /> },
-                { label: "Pledgers", value: "1 Lakh+", icon: <Users className="h-5 w-5 text-orange-500" /> },
+                { label: "Sight Restored", value: "2 Lives", icon: <Eye className="h-6 w-6 text-orange-500" /> },
+                { label: "Critical Window", value: "6 Hours", icon: <Clock className="h-6 w-6 text-red-500" /> },
+                { label: "Pledgers", value: "1 Lakh+", icon: <Users className="h-6 w-6 text-orange-500" /> },
               ].map((s) => (
-                <div key={s.label} className="bg-white border border-orange-100 rounded-2xl p-3 flex flex-col items-center gap-1 shadow-sm">
-                  {s.icon}
-                  <span className="text-lg font-extrabold text-gray-900">{s.value}</span>
-                  <span className="text-[10px] text-gray-500 font-semibold text-center leading-tight">{s.label}</span>
+                <div key={s.label} className="flex flex-col items-center gap-2">
+                  <div className="h-12 w-12 bg-white rounded-2xl shadow-sm border border-orange-50 flex items-center justify-center">
+                    {s.icon}
+                  </div>
+                  <div className="text-center">
+                    <span className="block text-xl md:text-2xl font-extrabold text-gray-900">{s.value}</span>
+                    <span className="block text-[11px] md:text-xs text-gray-500 font-semibold uppercase tracking-wider">{s.label}</span>
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/* Helpline */}
-            <a href="tel:1919" className="flex items-center gap-4 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-2xl p-4 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer group">
-              <div className="h-11 w-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:rotate-12 transition-transform">
-                <Phone className="h-6 w-6 animate-pulse" />
-              </div>
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-widest text-white/80">Emergency Eye Bank Helpline • 24/7</p>
-                <p className="text-xl font-extrabold tracking-tight">Call Toll-Free: 1919</p>
-              </div>
-            </a>
-
-            {/* Big CTA Button */}
-            <Link href="/donate?intent=emergency">
-              <button className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] p-[2px] shadow-xl hover:shadow-2xl transition-all duration-300">
-                <div className="relative flex items-center justify-between bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] rounded-[14px] px-6 py-4 text-white">
-                  <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300 rounded-[14px]" />
-                  <div className="flex items-center gap-3 z-10">
-                    <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                      <HeartHandshake className="h-5 w-5" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-white/80">Eye Donation — Within 6 Hours of Death</p>
-                      <p className="text-lg font-extrabold leading-tight">Click Now — Notify Our Team</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-6 w-6 z-10 group-hover:translate-x-1.5 transition-transform duration-300" />
-                </div>
-              </button>
-            </Link>
-          </motion.div>
-
-          {/* ── RIGHT: Emergency Form ────────────────────────────────── */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-          >
-            <div className="bg-white border border-orange-100 rounded-3xl shadow-2xl overflow-hidden">
-              {/* Card header bar */}
-              <div className="bg-gradient-to-r from-red-600 to-orange-500 px-6 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
-                    <AlertCircle className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-white font-extrabold text-base leading-tight">Emergency Eye Donation Request</h2>
-                    <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest">Fill form — Our team will call you back immediately</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6">
-                <AnimatePresence mode="wait">
-                  {successData ? (
-                    <SuccessView
-                      key="success"
-                      callId={successData.callId}
-                      whatsappUrl={successData.whatsappUrl}
-                      onReset={() => { setSuccessData(null); form.reset(); }}
-                    />
-                  ) : (
-                    <motion.form
-                      key="form"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      onSubmit={form.handleSubmit(onSubmit)}
-                      className="space-y-4"
-                    >
-                      {/* Name */}
-                      <div className="space-y-1.5">
-                        <Label className="text-[11px] font-extrabold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
-                          <User className="h-3.5 w-3.5 text-orange-500" /> Your Full Name
-                        </Label>
-                        <Input
-                          placeholder="e.g. Suresh Kumar"
-                          className="h-11 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-orange-400 font-medium shadow-sm"
-                          {...form.register("referrerName")}
-                        />
-                        {form.formState.errors.referrerName && (
-                          <p className="text-[10px] font-semibold text-red-500 flex items-center gap-1">
-                            <AlertCircle size={11} /> {form.formState.errors.referrerName.message}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Contact Number */}
-                      <div className="space-y-1.5">
-                        <Label className="text-[11px] font-extrabold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
-                          <Phone className="h-3.5 w-3.5 text-orange-500" /> Contact Number
-                        </Label>
-                        <Input
-                          type="tel"
-                          className="h-11 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-orange-400 font-semibold tracking-wide shadow-sm"
-                          {...form.register("referrerMobile", { onChange: handleMobileInput })}
-                        />
-                        {form.formState.errors.referrerMobile ? (
-                          <p className="text-[10px] font-semibold text-red-500 flex items-center gap-1">
-                            <AlertCircle size={11} /> {form.formState.errors.referrerMobile.message}
-                          </p>
-                        ) : (
-                          <p className="text-[10px] text-gray-400">Include +91, 10 digits, not starting with 0</p>
-                        )}
-                      </div>
-
-                      {/* Address of Eye Collection */}
-                      <div className="space-y-1.5">
-                        <Label className="text-[11px] font-extrabold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
-                          <MapPin className="h-3.5 w-3.5 text-orange-500" /> Address of Eye Collection
-                        </Label>
-                        <Input
-                          placeholder="e.g. 12, Gandhi Nagar, Near City Hospital"
-                          className="h-11 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-orange-400 font-medium shadow-sm"
-                          {...form.register("address")}
-                        />
-                        {form.formState.errors.address && (
-                          <p className="text-[10px] font-semibold text-red-500 flex items-center gap-1">
-                            <AlertCircle size={11} /> {form.formState.errors.address.message}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* State & District */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-[11px] font-extrabold text-gray-700 uppercase tracking-wide">State</Label>
-                          <Select onValueChange={(val) => {
-                            form.setValue("state", val, { shouldValidate: true });
-                            form.setValue("district", "", { shouldValidate: false });
-                            form.setValue("unitId", 0, { shouldValidate: false });
-                          }}>
-                            <SelectTrigger className="h-11 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-orange-400 shadow-sm text-sm font-medium">
-                              <SelectValue placeholder="Select State" />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-60">
-                              {INDIA_STATES.map(s => (
-                                <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {form.formState.errors.state && (
-                            <p className="text-[10px] font-semibold text-red-500">{form.formState.errors.state.message}</p>
-                          )}
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <Label className="text-[11px] font-extrabold text-gray-700 uppercase tracking-wide">District</Label>
-                          <Select
-                            disabled={!selectedState}
-                            onValueChange={(val) => form.setValue("district", val, { shouldValidate: true })}
-                          >
-                            <SelectTrigger className="h-11 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-orange-400 shadow-sm text-sm font-medium disabled:opacity-50">
-                              <SelectValue placeholder={selectedState ? "Select District" : "Select State first"} />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-60">
-                              {districts.map(d => (
-                                <SelectItem key={d} value={d}>{d}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {form.formState.errors.district && (
-                            <p className="text-[10px] font-semibold text-red-500">{form.formState.errors.district.message}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Nearest Sankara Unit — filtered by state */}
-                      <div className="space-y-1.5">
-                        <Label className="text-[11px] font-extrabold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
-                          <Building2 className="h-3.5 w-3.5 text-orange-500" /> Nearest Sankara Hospital Unit
-                        </Label>
-                        {selectedState && filteredUnits.length > 0 && filteredUnits.length < (units?.length ?? 99) && (
-                          <p className="text-[10px] text-green-700 font-bold bg-green-50 border border-green-100 rounded-lg px-2 py-1 flex items-center gap-1">
-                            <CheckCircle2 size={11} /> Showing {filteredUnits.length} Sankara unit(s) in {selectedState}
-                          </p>
-                        )}
-                        <Select onValueChange={(val) => form.setValue("unitId", Number(val), { shouldValidate: true })}>
-                          <SelectTrigger className="h-11 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-orange-400 shadow-sm text-sm font-medium">
-                            <SelectValue placeholder="Select closest hospital unit" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-60">
-                            {filteredUnits.map(u => (
-                              <SelectItem key={u.id} value={u.id.toString()}>
-                                {u.name} — {u.district}, {u.state}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {form.formState.errors.unitId && (
-                          <p className="text-[10px] font-semibold text-red-500 flex items-center gap-1">
-                            <AlertCircle size={11} /> {form.formState.errors.unitId.message}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Submit */}
-                      <Button
-                        type="submit"
-                        disabled={submitCall.isPending}
-                        className="w-full h-14 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-600 text-white rounded-2xl shadow-lg border-0 text-base font-extrabold flex items-center justify-center gap-2 mt-2 transition-all"
-                      >
-                        {submitCall.isPending ? (
-                          <div className="flex items-center gap-2">
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                            Logging Emergency...
-                          </div>
-                        ) : (
-                          <>
-                            <Send size={18} />
-                            Dispatch Team &amp; Call Me Back
-                          </>
-                        )}
-                      </Button>
-
-                      <p className="text-[10px] text-gray-400 text-center">
-                        By submitting, you authorize Sankara Eye Bank to contact you for eye retrieval coordination.
-                      </p>
-                    </motion.form>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
           </motion.div>
         </div>
       </section>

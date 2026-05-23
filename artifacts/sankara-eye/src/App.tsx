@@ -10,10 +10,13 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Donate from "@/pages/donate";
 import Dashboard from "@/pages/dashboard";
-import EyeCalls from "@/pages/eye-calls";
-import Units from "@/pages/units";
-import Users from "@/pages/users";
-import Profile from "@/pages/profile";
+import EyeCalls from "./pages/eye-calls";
+import Units from "./pages/units";
+import Users from "./pages/users";
+import Profile from "./pages/profile";
+import WhatsAppSettings from "./pages/whatsapp-settings";
+import EmailSettings from "./pages/email-settings";
+import Notifications from "./pages/notifications";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -436,6 +439,9 @@ function AuthProviderWithRoutes() {
           <Route path="/eye-calls"><ProtectedRoute component={EyeCalls} /></Route>
           <Route path="/units"><ProtectedRoute component={Units} /></Route>
           <Route path="/users"><ProtectedRoute component={Users} /></Route>
+          <Route path="/notifications"><ProtectedRoute component={Notifications} /></Route>
+          <Route path="/settings/whatsapp"><ProtectedRoute component={WhatsAppSettings} /></Route>
+          <Route path="/settings/email"><ProtectedRoute component={EmailSettings} /></Route>
           <Route path="/profile"><ProtectedRoute component={Profile} /></Route>
           
           <Route component={NotFound} />

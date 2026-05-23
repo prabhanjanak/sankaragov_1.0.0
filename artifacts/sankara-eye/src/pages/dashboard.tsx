@@ -278,13 +278,46 @@ function StatCard({ title, value, icon, color, sub }: {
 export default function Dashboard() {
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [search, setSearch] = useState("");
+  const [selectedUnit, setSelectedUnit] = useState<number | "all">("all");
   const { user } = useAuth();
   const isAdmin = user?.role === "super_admin";
 
-  const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
-  const { data: statusData, isLoading: statusLoading } = useGetCallsByStatus();
-  const { data: unitData, isLoading: unitLoading } = useGetCallsByUnit();
-  const { data: recentCalls, isLoading: recentLoading } = useGetRecentCalls({ limit: 8 });
+  const { data: units } = useListUnits({});
+
+  const { data: globalStats, isLoading: globalStatsLoading } = useGetDashboardStats();
+  const { data: globalStatusData, isLoading: globalStatusLoading } = useGetCallsByStatus();
+  const { data: globalUnitData, isLoading: globalUnitLoading } = useGetCallsByUnit();
+  const { data: globalRecentCalls, isLoading: globalRecentLoading } = useGetRecentCalls({ limit: 8 });
+
+  const { data: unitCallsData, isLoading: unitCallsLoading } = useListEyeCalls(
+    { unitId: selectedUnit === "all" ? undefined : selectedUnit, limit: 100 }
+  );
+
+  const stats = selectedUnit === "all" ? globalStats : {
+    totalCalls: unitCallsData?.data?.length || 0,
+    newCalls: unitCallsData?.data?.filter(c => c.status === "new").length || 0,
+    contactedCalls: unitCallsData?.data?.filter(c => c.status === "contacted").length || 0,
+    teamSentCalls: unitCallsData?.data?.filter(c => c.status === "team_sent").length || 0,
+    completedCalls: unitCallsData?.data?.filter(c => c.status === "completed").length || 0,
+    cancelledCalls: unitCallsData?.data?.filter(c => c.status === "cancelled").length || 0,
+    totalUnits: 1,
+    activeUnits: 1
+  };
+
+  const statusData = selectedUnit === "all" ? globalStatusData : [
+    { status: "new", count: stats?.newCalls || 0 },
+    { status: "contacted", count: stats?.contactedCalls || 0 },
+    { status: "team_sent", count: stats?.teamSentCalls || 0 },
+    { status: "completed", count: stats?.completedCalls || 0 },
+    { status: "cancelled", count: stats?.cancelledCalls || 0 },
+  ].filter(s => s.count > 0);
+
+  const unitData = selectedUnit === "all" ? globalUnitData : [];
+  const recentCalls = selectedUnit === "all" ? globalRecentCalls : unitCallsData?.data?.slice(0, 8);
+
+  const statsLoading = selectedUnit === "all" ? globalStatsLoading : unitCallsLoading;
+  const statusLoading = selectedUnit === "all" ? globalStatusLoading : unitCallsLoading;
+  const unitLoading = selectedUnit === "all" ? globalUnitLoading : false;
 
   const filteredRecent = useMemo(() => {
     if (!recentCalls || !search) return recentCalls || [];
@@ -315,12 +348,27 @@ export default function Dashboard() {
             {isAdmin ? "Super Admin — All Units Overview" : `Unit Coordinator — ${user?.name}`}
           </p>
         </div>
-        <Button
-          onClick={() => setShowManualEntry(true)}
-          className="bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] text-white rounded-xl font-bold border-0 h-10 px-5 flex items-center gap-2 shadow-md hover:shadow-lg"
-        >
-          <Plus size={16} /> Manual Entry
-        </Button>
+        <div className="flex items-center gap-3">
+          {isAdmin && (
+            <Select value={selectedUnit.toString()} onValueChange={v => setSelectedUnit(v === "all" ? "all" : Number(v))}>
+              <SelectTrigger className="w-[180px] h-10 rounded-xl bg-white border-gray-200 shadow-sm font-semibold text-gray-700">
+                <SelectValue placeholder="All Units" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Units</SelectItem>
+                {units?.map(u => (
+                  <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button
+            onClick={() => setShowManualEntry(true)}
+            className="bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] text-white rounded-xl font-bold border-0 h-10 px-5 flex items-center gap-2 shadow-md hover:shadow-lg"
+          >
+            <Plus size={16} /> Manual Entry
+          </Button>
+        </div>
       </div>
 
       {/* ── Stat Cards ── */}
@@ -450,8 +498,8 @@ export default function Dashboard() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {recentLoading ? (
-            <div className="p-6 space-y-3">
+          {globalRecentLoading ? (
+            <div className="p-6 space-y-4">
               {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
             </div>
           ) : (

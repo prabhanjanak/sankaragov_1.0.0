@@ -129,22 +129,33 @@ export default function EyeCalls() {
                       <StatusBadge status={call.status} />
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Select 
-                        value={call.status} 
-                        onValueChange={(val) => handleStatusChange(call.id, val as EyeCallStatus)}
-                        disabled={updateStatus.isPending}
-                      >
-                        <SelectTrigger className="w-[130px] h-8 text-xs">
-                          <SelectValue placeholder="Update Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="new">New</SelectItem>
-                          <SelectItem value="contacted">Contacted</SelectItem>
-                          <SelectItem value="team_sent">Team Sent</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      {call.status === "new" ? (
+                        <div className="flex flex-col gap-1.5 w-[130px]">
+                          <Button size="sm" className="h-7 bg-red-600 hover:bg-red-700 text-white text-[10px] uppercase font-bold w-full" onClick={() => handleStatusChange(call.id, "team_sent")}>
+                            Dispatch Team
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 text-[10px] uppercase font-bold w-full text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => handleStatusChange(call.id, "contacted")}>
+                            Call Me Back
+                          </Button>
+                        </div>
+                      ) : (
+                        <Select 
+                          value={call.status} 
+                          onValueChange={(val) => handleStatusChange(call.id, val as EyeCallStatus)}
+                          disabled={updateStatus.isPending}
+                        >
+                          <SelectTrigger className="w-[130px] h-8 text-xs font-semibold">
+                            <SelectValue placeholder="Update Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="new">New</SelectItem>
+                            <SelectItem value="contacted">Contacted</SelectItem>
+                            <SelectItem value="team_sent">Team Sent</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

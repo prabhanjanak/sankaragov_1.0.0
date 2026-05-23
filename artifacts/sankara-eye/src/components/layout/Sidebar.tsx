@@ -9,6 +9,9 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  MessageCircle,
+  Mail,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -24,6 +27,9 @@ export function Sidebar() {
     { href: "/eye-calls", label: "Eye Calls", icon: PhoneCall, roles: ["super_admin", "eye_bank_head", "unit_coordinator"] },
     { href: "/units", label: "Units", icon: Building2, roles: ["super_admin", "eye_bank_head"] },
     { href: "/users", label: "Users", icon: Users, roles: ["super_admin"] },
+    { href: "/notifications", label: "Notifications", icon: Bell, roles: ["super_admin", "eye_bank_head", "unit_coordinator"] },
+    { href: "/settings/whatsapp", label: "WhatsApp API", icon: MessageCircle, roles: ["super_admin"] },
+    { href: "/settings/email", label: "Email SMTP", icon: Mail, roles: ["super_admin"] },
     { href: "/profile", label: "Profile", icon: UserCircle, roles: ["super_admin", "eye_bank_head", "unit_coordinator"] },
   ];
 
