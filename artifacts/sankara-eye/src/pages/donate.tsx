@@ -450,9 +450,9 @@ export default function Donate() {
       
       {/* Premium Header */}
       <header className="h-16 md:h-20 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-4 md:px-12 sticky top-0 z-50">
-        <Link href="/">
+        <a href="https://sankaraeye.com/" target="_blank" rel="noopener noreferrer">
           <img src={`${BASE_PATH}/logo.png`} alt="Sankara Eye Foundation" className="h-10 md:h-12 object-contain cursor-pointer hover:scale-[1.01] transition-transform duration-300" />
-        </Link>
+        </a>
         <Link href="/">
           <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-900 rounded-xl h-9 md:h-10 text-xs font-semibold gap-1.5">
             <ArrowLeft className="h-3.5 w-3.5" /> Back to Home

@@ -108,7 +108,9 @@ export default function Home() {
 
       {/* ── Top Nav ──────────────────────────────────────────────────────── */}
       <header className="h-16 border-b border-gray-100 flex items-center justify-between px-4 md:px-10 bg-white/95 backdrop-blur-md sticky top-0 z-50 shadow-sm">
-        <img src={`${BASE_PATH}/logo.png`} alt="Sankara Eye Foundation" className="h-10 md:h-11 w-auto object-contain" />
+        <a href="https://sankaraeye.com/" target="_blank" rel="noopener noreferrer" className="cursor-pointer hover:scale-[1.02] transition-transform">
+          <img src={`${BASE_PATH}/logo.png`} alt="Sankara Eye Foundation" className="h-10 md:h-11 w-auto object-contain" />
+        </a>
         <div className="flex items-center gap-2">
           {isSignedIn ? (
             <Link href="/dashboard">
