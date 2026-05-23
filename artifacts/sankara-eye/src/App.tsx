@@ -23,11 +23,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, Lock, Mail, AlertTriangle, KeyRound, LogOut } from "lucide-react";
 
 const queryClient = new QueryClient();
-const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+import { BASE_PATH } from "./lib/constants";
 
 function stripBase(path: string): string {
-  return basePath && path.startsWith(basePath)
-    ? path.slice(basePath.length) || "/"
+  return BASE_PATH && path.startsWith(BASE_PATH)
+    ? path.slice(BASE_PATH.length) || "/"
     : path;
 }
 
@@ -80,7 +80,7 @@ function SignInPage() {
 
       <div className="w-full max-w-[440px] flex justify-center pb-2 z-10">
         <img
-          src={`${basePath}/logo.png`}
+          src={`${BASE_PATH}/logo.png`}
           alt="Sankara Eye Foundation"
           className="w-full max-w-[340px] h-auto object-contain hover:scale-[1.02] transition-transform duration-300"
         />
@@ -448,7 +448,7 @@ function AuthProviderWithRoutes() {
 function App() {
   return (
     <TooltipProvider>
-      <WouterRouter base={basePath}>
+      <WouterRouter base={BASE_PATH}>
         <AuthProviderWithRoutes />
       </WouterRouter>
       <Toaster />

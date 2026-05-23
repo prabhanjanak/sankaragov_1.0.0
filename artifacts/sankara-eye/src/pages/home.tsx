@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { BASE_PATH } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -159,7 +160,7 @@ export default function Home() {
 
       {/* ── Top Nav ──────────────────────────────────────────────────────── */}
       <header className="h-16 border-b border-gray-100 flex items-center justify-between px-4 md:px-10 bg-white/95 backdrop-blur-md sticky top-0 z-50 shadow-sm">
-        <img src="/logo.png" alt="Sankara Eye Foundation" className="h-10 md:h-11 w-auto object-contain" />
+        <img src={`${BASE_PATH}/logo.png`} alt="Sankara Eye Foundation" className="h-10 md:h-11 w-auto object-contain" />
         <div className="flex items-center gap-2">
           {isSignedIn ? (
             <Link href="/dashboard">

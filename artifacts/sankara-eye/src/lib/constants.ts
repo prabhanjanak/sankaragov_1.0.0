@@ -269,7 +269,9 @@ export const INDIA_STATES = [
     districts: [
       "Central Delhi", "East Delhi", "New Delhi", "North Delhi", "North East Delhi",
       "North West Delhi", "Shahdara", "South Delhi", "South East Delhi",
-      "South West Delhi", "West Delhi"
     ],
   },
 ];
+
+export const BASE_PATH = import.meta.env.BASE_URL.replace(/\/$/, "");
+

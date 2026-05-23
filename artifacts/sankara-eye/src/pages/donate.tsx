@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useSubmitPublicEyeCall, useListPublicUnits } from "@workspace/api-client-react";
-import { INDIA_STATES } from "@/lib/constants";
+import { INDIA_STATES, BASE_PATH } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -296,7 +296,7 @@ export default function Donate() {
               {/* === HEADER BAND === */}
               <div className="bg-gradient-to-r from-[#7b0000] via-[#a30000] to-[#7b0000] px-8 py-4 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-4 bg-white/90 rounded-xl px-3 py-1.5">
-                  <img src="/logo.png" alt="Sankara Eye Foundation" className="h-10 object-contain" />
+                  <img src={`${BASE_PATH}/logo.png`} alt="Sankara Eye Foundation" className="h-10 object-contain" />
                 </div>
                 <div className="text-center">
                   <p className="text-white/80 text-[10px] font-bold uppercase tracking-[0.3em]">Official Document</p>
@@ -312,7 +312,7 @@ export default function Donate() {
               <div className="flex-1 flex flex-col items-center justify-center px-12 py-4 text-center relative">
                 {/* Watermark */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04]">
-                  <img src="/logo.png" alt="" className="w-64 h-64 object-contain" />
+                  <img src={`${BASE_PATH}/logo.png`} alt="" className="w-64 h-64 object-contain" />
                 </div>
 
                 {/* Decorative top flourish */}
@@ -365,7 +365,7 @@ export default function Donate() {
                   <p className="text-xs font-extrabold text-gray-800">{successData.unitName || "Sankara Eye Hospital"}</p>
                 </div>
                 <div className="text-center flex flex-col items-center gap-0.5">
-                  <img src="/logo.png" alt="Sankara" className="h-9 object-contain opacity-60" />
+                  <img src={`${BASE_PATH}/logo.png`} alt="Sankara" className="h-9 object-contain opacity-60" />
                   <p className="text-[8px] text-[#8b6914] font-semibold tracking-wide">Sri Kanchi Kamakoti Medical Trust</p>
                 </div>
                 <div className="text-right">
@@ -451,7 +451,7 @@ export default function Donate() {
       {/* Premium Header */}
       <header className="h-16 md:h-20 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-4 md:px-12 sticky top-0 z-50">
         <Link href="/">
-          <img src="/logo.png" alt="Sankara Eye Foundation" className="h-10 md:h-12 object-contain cursor-pointer hover:scale-[1.01] transition-transform duration-300" />
+          <img src={`${BASE_PATH}/logo.png`} alt="Sankara Eye Foundation" className="h-10 md:h-12 object-contain cursor-pointer hover:scale-[1.01] transition-transform duration-300" />
         </Link>
         <Link href="/">
           <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-900 rounded-xl h-9 md:h-10 text-xs font-semibold gap-1.5">

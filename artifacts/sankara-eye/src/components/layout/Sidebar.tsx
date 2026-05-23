@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { BASE_PATH } from "@/lib/constants";
 
 export function Sidebar() {
   const [location] = useLocation();
@@ -37,9 +38,9 @@ export function Sidebar() {
     >
       <div className="h-16 flex items-center justify-center border-b border-gray-200 px-4 overflow-hidden">
         {collapsed ? (
-          <img src="/logo.png" alt="SEFI" className="h-8 w-8 object-cover object-top rounded-full border border-orange-100 shadow-sm" />
+          <img src={`${BASE_PATH}/logo.png`} alt="SEFI" className="h-8 w-8 object-cover object-top rounded-full border border-orange-100 shadow-sm" />
         ) : (
-          <img src="/logo.png" alt="Sankara Eye Foundation" className="h-12 w-full object-contain" />
+          <img src={`${BASE_PATH}/logo.png`} alt="Sankara Eye Foundation" className="h-12 w-full object-contain" />
         )}
       </div>
 
