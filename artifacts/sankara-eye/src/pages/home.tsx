@@ -1,18 +1,107 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { BASE_PATH } from "@/lib/constants";
+import { BASE_PATH, INDIA_STATES } from "@/lib/constants";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useSubmitPublicEyeCall, useListPublicUnits } from "@workspace/api-client-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Eye, Clock, Phone, Heart, ArrowRight, ShieldAlert, HeartHandshake,
-  Award, CheckCircle2, BookOpen, Sparkles, Info, Users, Share2, Download
+  Award, CheckCircle2, BookOpen, Sparkles, Info, Users, Share2, Download, AlertCircle, MapPin, Building2, User, Send
 } from "lucide-react";
+
+// ─── Validation ──────────────────────────────────────────────────────────────
+const mobileRegex = /^\+91 [6-9]\d{9}$/;
+
+const emergencySchema = z.object({
+  referrerName: z.string().min(2, "Your name is required"),
+  referrerMobile: z.string().regex(mobileRegex, "Enter a valid 10-digit number not starting with 0"),
+  address: z.string().min(5, "Address of eye collection is required"),
+  state: z.string().min(2, "State is required"),
+  district: z.string().min(2, "District is required"),
+  unitId: z.coerce.number().min(1, "Please select the nearest Sankara hospital unit"),
+});
+
+type EmergencyValues = z.infer<typeof emergencySchema>;
 
 export default function Home() {
   const { user } = useAuth();
   const isSignedIn = !!user;
   const [activeSection, setActiveSection] = useState<"guidelines" | "pledge">("guidelines");
+
+  const { data: units } = useListPublicUnits();
+  const submitCall = useSubmitPublicEyeCall();
+
+  const emergencyForm = useForm<EmergencyValues>({
+    resolver: zodResolver(emergencySchema),
+    defaultValues: {
+      referrerName: "",
+      referrerMobile: "+91 ",
+      address: "",
+      state: "",
+      district: "",
+      unitId: 0,
+    },
+  });
+
+  const emergencySelectedState = emergencyForm.watch("state");
+  const emergencyDistricts = useMemo(() => {
+    const stateObj = INDIA_STATES.find(s => s.name === emergencySelectedState);
+    return stateObj ? stateObj.districts : [];
+  }, [emergencySelectedState]);
+
+  const emergencyFilteredUnits = useMemo(() => {
+    if (!units) return [];
+    if (!emergencySelectedState) return units;
+    const stateMatched = units.filter(u => u.state === emergencySelectedState);
+    return stateMatched.length > 0 ? stateMatched : units;
+  }, [units, emergencySelectedState]);
+
+  const handleMobileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value;
+    if (!val.startsWith("+91 ")) {
+      emergencyForm.setValue("referrerMobile", "+91 ", { shouldValidate: true });
+      return;
+    }
+    const prefix = "+91 ";
+    let suffix = val.substring(prefix.length).replace(/\D/g, "");
+    if (suffix.startsWith("0")) suffix = suffix.substring(1);
+    emergencyForm.setValue("referrerMobile", prefix + suffix.substring(0, 10), { shouldValidate: true });
+  };
+
+  const onEmergencySubmit = (data: EmergencyValues) => {
+    const payload = {
+      referrerName: data.referrerName,
+      referrerMobile: data.referrerMobile,
+      referrerRelationship: "Relative / Family",
+      donorName: "Deceased Relative (Emergency Callback)",
+      donorAge: 0,
+      donorGender: "other" as const,
+      timeOfDeath: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) + " (Today)",
+      causeOfDeath: "Not Specified (Emergency Mode)",
+      state: data.state,
+      district: data.district,
+      pincode: "000000",
+      address: data.address,
+      unitId: data.unitId,
+    };
+
+    submitCall.mutate({ data: payload }, {
+      onSuccess: (response) => {
+        // Just redirect to whatsapp directly for simplicity on home page
+        window.open(response.whatsappUrl, "_blank");
+        emergencyForm.reset();
+        alert("Emergency Logged! We are connecting you to WhatsApp.");
+      }
+    });
+  };
 
   return (
     <div className="min-h-screen w-full bg-white font-sans select-none overflow-x-hidden">
@@ -38,19 +127,17 @@ export default function Home() {
       </header>
 
       {/* ── HERO SECTION ─────────────────────────────────────────────────── */}
-      <section className="relative w-full overflow-hidden bg-gradient-to-br from-[#fff8f2] via-white to-[#fff3e6] min-h-[80vh] flex flex-col justify-center">
-
-        {/* Decorative blobs */}
+      <section className="relative w-full overflow-hidden bg-gradient-to-br from-[#fff8f2] via-white to-[#fff3e6] min-h-[85vh] py-16">
         <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-orange-100 rounded-full blur-[160px] opacity-50 pointer-events-none -z-0" />
         <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-yellow-100 rounded-full blur-[120px] opacity-40 pointer-events-none -z-0" />
 
-        <div className="relative z-10 max-w-5xl mx-auto px-4 md:px-10 pt-16 pb-20 flex flex-col items-center text-center">
+        <div className="relative z-10 max-w-5xl mx-auto px-4 md:px-10 flex flex-col items-center text-center">
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="flex flex-col items-center gap-8 w-full"
+            className="flex flex-col items-center gap-6 w-full"
           >
             {/* Urgent Badge */}
             <div className="inline-flex items-center gap-2 bg-red-600 text-white px-5 py-2 rounded-full text-xs sm:text-sm font-extrabold uppercase tracking-widest shadow-lg animate-pulse">
@@ -58,76 +145,152 @@ export default function Home() {
               Time Critical — Act Within 6 Hours of Death
             </div>
 
-            <div className="space-y-6 max-w-3xl">
-              <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold text-gray-900 leading-[1.08] tracking-tight">
-                Give the
-                <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff7a18] via-[#ff9f43] to-[#ffb347]">
-                  Miracle of Sight
-                </span>
+            <div className="space-y-4 max-w-3xl">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 leading-[1.08] tracking-tight">
+                Give the Miracle of <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff7a18] via-[#ff9f43] to-[#ffb347]">Sight</span>
               </h1>
-              <p className="text-lg md:text-xl text-gray-600 leading-relaxed max-w-2xl mx-auto">
-                Every eye donation restores sight to <span className="font-bold text-gray-900">two blind individuals</span>. 
-                Time is of the essence. Eye retrieval must happen within <span className="font-bold text-red-600">6 hours of death</span>.
+              <p className="text-base md:text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">
+                Every eye donation restores sight to two blind individuals. Eye retrieval must happen within <strong className="text-red-600">6 hours of death</strong>.
               </p>
             </div>
 
             {/* Helpline */}
-            <div className="flex justify-center my-2">
-              <a href="tel:1919" className="flex items-center gap-4 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-2xl p-4 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer group">
-                <div className="h-11 w-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:rotate-12 transition-transform">
-                  <Phone className="h-6 w-6 animate-pulse" />
-                </div>
-                <div className="text-left">
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-white/80">Emergency Eye Bank Helpline • 24/7</p>
-                  <p className="text-xl font-extrabold tracking-tight">Call Toll-Free: 1919</p>
-                </div>
-              </a>
-            </div>
+            <a href="tel:1919" className="flex items-center gap-4 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-2xl p-4 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer group mb-4">
+              <div className="h-11 w-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:rotate-12 transition-transform">
+                <Phone className="h-6 w-6 animate-pulse" />
+              </div>
+              <div className="text-left">
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-white/80">Emergency Eye Bank Helpline</p>
+                <p className="text-xl font-extrabold tracking-tight">Call Toll-Free: 1919</p>
+              </div>
+            </a>
 
-            {/* Huge CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 w-full max-w-2xl mt-4">
-              <Link href="/donate?intent=emergency" className="w-full sm:w-1/2">
-                <button className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-red-600 to-red-500 p-[2px] shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
-                  <div className="relative flex flex-col items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-500 rounded-[14px] px-6 py-6 text-white h-full">
-                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300 rounded-[14px]" />
-                    <HeartHandshake className="h-8 w-8 z-10 animate-bounce" />
-                    <div className="text-center z-10">
-                      <p className="text-lg md:text-xl font-extrabold leading-tight">Emergency Donation</p>
-                      <p className="text-xs font-bold text-white/80 mt-1 uppercase tracking-widest">Someone has passed away</p>
+            {/* WIDE EMERGENCY FORM */}
+            <Card className="w-full max-w-4xl border border-red-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.06)] rounded-3xl bg-white overflow-hidden relative text-left">
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-500 to-orange-500" />
+              <CardContent className="p-6 md:p-10 space-y-8">
+                
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-gray-100 pb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center text-red-600 shrink-0">
+                      <AlertCircle className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-extrabold text-gray-900 leading-snug">Emergency Eye Donation</h2>
+                      <p className="text-xs text-red-600 font-extrabold tracking-widest uppercase mt-0.5">Report a Recent Death</p>
                     </div>
                   </div>
-                </button>
-              </Link>
+                  <div className="bg-red-50 text-red-800 text-[10px] md:text-xs font-semibold px-4 py-2 rounded-xl text-right max-w-[200px]">
+                    We will dispatch a medical team instantly. Fill out this form accurately.
+                  </div>
+                </div>
 
-              <Link href="/donate?intent=pledge" className="w-full sm:w-1/2">
-                <button className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] p-[2px] shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
-                  <div className="relative flex flex-col items-center justify-center gap-2 bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] rounded-[14px] px-6 py-6 text-white h-full">
-                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300 rounded-[14px]" />
-                    <Award className="h-8 w-8 z-10" />
-                    <div className="text-center z-10">
-                      <p className="text-lg md:text-xl font-extrabold leading-tight">Pledge Your Eyes</p>
-                      <p className="text-xs font-bold text-white/80 mt-1 uppercase tracking-widest">Get your digital certificate</p>
+                <form onSubmit={emergencyForm.handleSubmit(onEmergencySubmit)} className="space-y-6">
+                  {/* Row 1: Name and Phone */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-red-500" /> Your Full Name</Label>
+                      <Input placeholder="e.g. Suresh Kumar" className="h-12 rounded-xl border-gray-200 bg-gray-50 focus:bg-white text-base font-medium" {...emergencyForm.register("referrerName")} />
+                      {emergencyForm.formState.errors.referrerName && <p className="text-[10px] text-red-500 font-semibold">{emergencyForm.formState.errors.referrerName.message}</p>}
                     </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-red-500" /> Contact Number</Label>
+                      <Input type="tel" className="h-12 rounded-xl border-gray-200 bg-gray-50 focus:bg-white text-base font-semibold tracking-wide" onChange={handleMobileInput} value={emergencyForm.watch("referrerMobile")} />
+                      {emergencyForm.formState.errors.referrerMobile && <p className="text-[10px] text-red-500 font-semibold">{emergencyForm.formState.errors.referrerMobile.message}</p>}
+                    </div>
+                  </div>
+
+                  {/* Row 2: Address */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-red-500" /> Address of Eye Collection</Label>
+                    <Input placeholder="e.g. 12, Gandhi Nagar, Near City Hospital" className="h-12 rounded-xl border-gray-200 bg-gray-50 focus:bg-white text-base font-medium" {...emergencyForm.register("address")} />
+                    {emergencyForm.formState.errors.address && <p className="text-[10px] text-red-500 font-semibold">{emergencyForm.formState.errors.address.message}</p>}
+                  </div>
+
+                  {/* Row 3: State, District, Unit */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-gray-700 uppercase tracking-wide">State</Label>
+                      <Select onValueChange={(val) => {
+                        emergencyForm.setValue("state", val, { shouldValidate: true });
+                        emergencyForm.setValue("district", "", { shouldValidate: false });
+                        emergencyForm.setValue("unitId", 0, { shouldValidate: false });
+                      }}>
+                        <SelectTrigger className="h-12 rounded-xl border-gray-200 bg-gray-50 focus:bg-white text-sm">
+                          <SelectValue placeholder="Select State" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {INDIA_STATES.map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-gray-700 uppercase tracking-wide">District</Label>
+                      <Select disabled={!emergencySelectedState} onValueChange={(val) => emergencyForm.setValue("district", val, { shouldValidate: true })}>
+                        <SelectTrigger className="h-12 rounded-xl border-gray-200 bg-gray-50 focus:bg-white text-sm disabled:opacity-50">
+                          <SelectValue placeholder="Select District" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {emergencyDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-red-500" /> Nearest Hospital</Label>
+                      <Select onValueChange={(val) => emergencyForm.setValue("unitId", Number(val), { shouldValidate: true })}>
+                        <SelectTrigger className="h-12 rounded-xl border-gray-200 bg-gray-50 focus:bg-white text-sm">
+                          <SelectValue placeholder="Select hospital" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {emergencyFilteredUnits.map(u => <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {emergencyForm.formState.errors.unitId && <p className="text-[10px] text-red-500 font-semibold">{emergencyForm.formState.errors.unitId.message}</p>}
+                    </div>
+                  </div>
+
+                  <div className="pt-4">
+                    <Button type="submit" disabled={submitCall.isPending} className="w-full h-14 bg-red-600 hover:bg-red-700 text-white rounded-2xl shadow-lg border-0 text-base font-extrabold flex items-center justify-center gap-2 transition-all">
+                      {submitCall.isPending ? "Logging Request..." : <><Send size={18} /> Dispatch Team &amp; Call Me Back</>}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* PLEDGE EYE CTA */}
+            <div className="mt-12 text-center flex flex-col items-center">
+              <p className="text-sm text-gray-500 font-bold tracking-widest uppercase mb-4">Want to become a sight ambassador?</p>
+              <Link href="/donate?intent=pledge">
+                <button className="group relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] p-[2px] shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+                  <div className="relative flex items-center justify-center gap-3 bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] rounded-[14px] px-10 py-5 text-white">
+                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300 rounded-[14px]" />
+                    <Award className="h-7 w-7 z-10" />
+                    <span className="text-xl font-extrabold z-10 tracking-tight">Pledge Your Eyes</span>
+                    <ArrowRight className="h-6 w-6 z-10 group-hover:translate-x-1.5 transition-transform duration-300" />
                   </div>
                 </button>
               </Link>
             </div>
 
             {/* Stats strip */}
-            <div className="grid grid-cols-3 gap-6 sm:gap-12 mt-12 w-full max-w-4xl border-t border-gray-200/60 pt-10">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-8 mt-16 w-full max-w-4xl border-t border-gray-200/60 pt-10">
               {[
-                { label: "Sight Restored", value: "2 Lives", icon: <Eye className="h-6 w-6 text-orange-500" /> },
-                { label: "Critical Window", value: "6 Hours", icon: <Clock className="h-6 w-6 text-red-500" /> },
-                { label: "Pledgers", value: "1 Lakh+", icon: <Users className="h-6 w-6 text-orange-500" /> },
+                { label: "Sight Restored", value: "2 Lives", icon: <Eye className="h-5 w-5 text-orange-500" /> },
+                { label: "Critical Window", value: "6 Hours", icon: <Clock className="h-5 w-5 text-red-500" /> },
+                { label: "Pledgers", value: "1 Lakh+", icon: <Users className="h-5 w-5 text-orange-500" /> },
+                { label: "Retrieval Time", value: "20 Mins", icon: <Heart className="h-5 w-5 text-orange-500" /> },
               ].map((s) => (
                 <div key={s.label} className="flex flex-col items-center gap-2">
-                  <div className="h-12 w-12 bg-white rounded-2xl shadow-sm border border-orange-50 flex items-center justify-center">
+                  <div className="h-10 w-10 bg-white rounded-xl shadow-sm border border-orange-50 flex items-center justify-center">
                     {s.icon}
                   </div>
                   <div className="text-center">
-                    <span className="block text-xl md:text-2xl font-extrabold text-gray-900">{s.value}</span>
-                    <span className="block text-[11px] md:text-xs text-gray-500 font-semibold uppercase tracking-wider">{s.label}</span>
+                    <span className="block text-lg font-extrabold text-gray-900">{s.value}</span>
+                    <span className="block text-[10px] text-gray-500 font-bold uppercase tracking-wider">{s.label}</span>
                   </div>
                 </div>
               ))}
@@ -137,217 +300,53 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── BELOW FOLD: Guidelines & Eye Pledge ──────────────────────────── */}
+      {/* ── BELOW FOLD: Guidelines ──────────────────────────── */}
       <section className="w-full bg-white border-t border-gray-100">
         <div className="max-w-7xl mx-auto px-4 md:px-10 py-16">
-
-          {/* Section Toggle */}
-          <div className="flex justify-center mb-10">
-            <div className="inline-flex bg-gray-100 rounded-2xl p-1.5 gap-1">
-              {[
-                { key: "guidelines", label: "Eye Donation Guidelines", icon: <BookOpen className="h-4 w-4" /> },
-                { key: "pledge", label: "Pledge Your Eyes", icon: <Award className="h-4 w-4" /> },
-              ].map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveSection(tab.key as any)}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-                    activeSection === tab.key
-                      ? "bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] text-white shadow-md"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-white"
-                  }`}
-                >
-                  {tab.icon}
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+          <div className="text-center mb-10">
+            <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 tracking-tight">
+              Essential <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff7a18] to-[#ff9f43]">Guidelines</span>
+            </h2>
+            <p className="text-sm text-gray-500 mt-2 max-w-xl mx-auto">
+              Important clinical instructions that every family must know when considering eye donation.
+            </p>
           </div>
 
-          <AnimatePresence mode="wait">
-
-            {/* ── GUIDELINES TAB ── */}
-            {activeSection === "guidelines" && (
-              <motion.div
-                key="guidelines"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -16 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="text-center mb-10">
-                  <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 tracking-tight">
-                    Essential <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff7a18] to-[#ff9f43]">Guidelines</span>
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-2 max-w-xl mx-auto">
-                    Important clinical instructions that every family must know when considering eye donation.
-                  </p>
-                </div>
-
-                {/* Critical Alert */}
-                <div className="bg-red-600 text-white rounded-3xl p-6 mb-8 flex items-start gap-4 shadow-xl">
-                  <div className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-                    <Clock className="h-7 w-7 animate-pulse" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-extrabold">CRITICAL: Eye Retrieval Must Happen Within 6 Hours of Death</h3>
-                    <p className="text-white/85 text-sm mt-1 leading-relaxed">
-                      The corneas begin to deteriorate rapidly after death. Immediate notification to our eye bank is absolutely essential to ensure the restoration of sight.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {[
-                    {
-                      icon: <ShieldAlert size={22} className="text-orange-600" />,
-                      bg: "bg-orange-50",
-                      border: "border-orange-100",
-                      color: "from-orange-500 to-orange-400",
-                      title: "Switch Off Fans Immediately",
-                      desc: "Turn off all ceiling fans in the room the moment death occurs. This prevents the corneas from drying out. Switch on AC if available to maintain a cool environment."
-                    },
-                    {
-                      icon: <CheckCircle2 size={22} className="text-green-600" />,
-                      bg: "bg-green-50",
-                      border: "border-green-100",
-                      color: "from-green-500 to-emerald-400",
-                      title: "Close Eyes & Wet Cotton",
-                      desc: "Gently close the deceased's eyes and place clean, wet cotton pads or a damp cloth over the closed eyelids. This keeps the corneas moist and viable."
-                    },
-                    {
-                      icon: <Info size={22} className="text-blue-600" />,
-                      bg: "bg-blue-50",
-                      border: "border-blue-100",
-                      color: "from-blue-500 to-blue-400",
-                      title: "Age, Sex & Religion — No Bar",
-                      desc: "Anyone can donate eyes regardless of age, sex, blood group, or religion. Even those who wear spectacles or have had cataract surgery are eligible donors."
-                    },
-                    {
-                      icon: <Sparkles size={22} className="text-amber-600" />,
-                      bg: "bg-amber-50",
-                      border: "border-amber-100",
-                      color: "from-amber-500 to-yellow-400",
-                      title: "Zero Disfigurement",
-                      desc: "The surgical retrieval takes only 20 minutes, is performed in any clean room (home or hospital), is completely free of charge, and leaves absolutely no facial disfigurement."
-                    },
-                    {
-                      icon: <Heart size={22} className="text-red-600" />,
-                      bg: "bg-red-50",
-                      border: "border-red-100",
-                      color: "from-red-500 to-red-400",
-                      title: "Ethical & Free",
-                      desc: "Donated eyes are never sold. They are used purely to restore vision for blind individuals free of charge, in strict accordance with the Transplantation of Human Organs Act."
-                    },
-                    {
-                      icon: <Eye size={22} className="text-purple-600" />,
-                      bg: "bg-purple-50",
-                      border: "border-purple-100",
-                      color: "from-purple-500 to-purple-400",
-                      title: "Illuminate Two Lives",
-                      desc: "One donation = sight restored to TWO blind individuals. Corneal blindness is curable through transplantation. Your decision can transform two lives plunged in darkness."
-                    },
-                  ].map((item, i) => (
-                    <div
-                      key={i}
-                      className={`relative bg-white ${item.border} border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group overflow-hidden`}
-                    >
-                      <div className={`absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b ${item.color} group-hover:w-2 transition-all`} />
-                      <div className={`${item.bg} h-11 w-11 rounded-2xl flex items-center justify-center mb-4`}>{item.icon}</div>
-                      <h4 className="font-extrabold text-gray-900 text-[15px] mb-2">{item.title}</h4>
-                      <p className="text-xs text-gray-600 leading-relaxed">{item.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-
-            {/* ── PLEDGE TAB ── */}
-            {activeSection === "pledge" && (
-              <motion.div
-                key="pledge"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -16 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="max-w-4xl mx-auto">
-                  {/* Hero pledge card */}
-                  <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#ff7a18] via-[#ff9f43] to-[#ffb347] p-1 shadow-2xl">
-                    <div className="rounded-[22px] bg-white p-8 md:p-12">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                        {/* Left: copy */}
-                        <div className="space-y-5">
-                          <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-100 px-4 py-1.5 rounded-full text-xs font-extrabold text-orange-600 uppercase tracking-widest">
-                            <Award className="h-3.5 w-3.5" /> Sight Ambassador
-                          </div>
-                          <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 leading-tight">
-                            Pledge Your Eyes.<br/>
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff7a18] to-[#ff9f43]">Change Two Lives.</span>
-                          </h2>
-                          <p className="text-sm text-gray-600 leading-relaxed">
-                            A simple pledge today secures sight for two blind individuals tomorrow. Register your commitment, get a beautiful digital certificate, and inspire your family.
-                          </p>
-                          <div className="space-y-3">
-                            {[
-                              { icon: <Users className="h-4 w-4 text-orange-500" />, text: "Join 1 Lakh+ Sight Ambassadors across India" },
-                              { icon: <Download className="h-4 w-4 text-orange-500" />, text: "Receive a printable Certificate of Appreciation" },
-                              { icon: <Share2 className="h-4 w-4 text-orange-500" />, text: "Share on WhatsApp and inspire your loved ones" },
-                              { icon: <Heart className="h-4 w-4 text-orange-500" />, text: "One donation = Two lives restored permanently" },
-                            ].map((item, i) => (
-                              <div key={i} className="flex items-center gap-3">
-                                <div className="h-7 w-7 rounded-lg bg-orange-50 flex items-center justify-center shrink-0">{item.icon}</div>
-                                <span className="text-sm text-gray-700 font-medium">{item.text}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        {/* Right: CTA */}
-                        <div className="flex flex-col items-center gap-5">
-                          <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-orange-400 to-amber-300 flex items-center justify-center shadow-xl">
-                            <Award className="h-14 w-14 text-white drop-shadow" />
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-gray-500 font-semibold uppercase tracking-widest mb-1">Official Eye Pledge</p>
-                            <h3 className="text-xl font-extrabold text-gray-900">Register & Get Certificate</h3>
-                            <p className="text-xs text-gray-400 mt-1">Takes less than 2 minutes • Completely free</p>
-                          </div>
-                          <Link href="/donate?intent=pledge" className="w-full">
-                            <button className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] p-[2px] shadow-lg hover:shadow-xl transition-all duration-300">
-                              <div className="relative flex items-center justify-center gap-3 bg-gradient-to-r from-[#ff7a18] to-[#ff9f43] rounded-[14px] px-6 py-4 text-white">
-                                <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300 rounded-[14px]" />
-                                <HeartHandshake className="h-5 w-5 z-10" />
-                                <span className="text-base font-extrabold z-10">Pledge Your Eyes Now</span>
-                                <ArrowRight className="h-5 w-5 z-10 group-hover:translate-x-1 transition-transform duration-300" />
-                              </div>
-                            </button>
-                          </Link>
-                          <p className="text-[10px] text-gray-400 text-center">
-                            By pledging, you authorize Sankara Eye Bank to record your commitment. You will receive a digital certificate instantly.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Info strip below */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-                    {[
-                      { value: "1 Lakh+", label: "Pledgers" },
-                      { value: "2 Lives", label: "Per Donation" },
-                      { value: "Free", label: "Certificate" },
-                      { value: "20 Min", label: "Retrieval Time" },
-                    ].map((s, i) => (
-                      <div key={i} className="bg-white border border-gray-100 rounded-2xl p-4 text-center shadow-sm">
-                        <div className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#ff7a18] to-[#ff9f43]">{s.value}</div>
-                        <div className="text-xs text-gray-500 font-semibold mt-0.5">{s.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {[
+              {
+                icon: <ShieldAlert size={22} className="text-orange-600" />, bg: "bg-orange-50", border: "border-orange-100", color: "from-orange-500 to-orange-400",
+                title: "Switch Off Fans", desc: "Turn off all ceiling fans in the room the moment death occurs. Switch on AC if available."
+              },
+              {
+                icon: <CheckCircle2 size={22} className="text-green-600" />, bg: "bg-green-50", border: "border-green-100", color: "from-green-500 to-emerald-400",
+                title: "Close Eyes & Wet Cotton", desc: "Gently close the deceased's eyes and place clean, wet cotton pads over the closed eyelids."
+              },
+              {
+                icon: <Info size={22} className="text-blue-600" />, bg: "bg-blue-50", border: "border-blue-100", color: "from-blue-500 to-blue-400",
+                title: "Age, Sex & Religion", desc: "Anyone can donate eyes regardless of age, sex, blood group, or religion."
+              },
+              {
+                icon: <Sparkles size={22} className="text-amber-600" />, bg: "bg-amber-50", border: "border-amber-100", color: "from-amber-500 to-yellow-400",
+                title: "Zero Disfigurement", desc: "The surgical retrieval takes only 20 minutes and leaves absolutely no facial disfigurement."
+              },
+              {
+                icon: <Heart size={22} className="text-red-600" />, bg: "bg-red-50", border: "border-red-100", color: "from-red-500 to-red-400",
+                title: "Ethical & Free", desc: "Donated eyes are never sold. They are used purely to restore vision free of charge."
+              },
+              {
+                icon: <Eye size={22} className="text-purple-600" />, bg: "bg-purple-50", border: "border-purple-100", color: "from-purple-500 to-purple-400",
+                title: "Illuminate Two Lives", desc: "One donation gives sight to TWO blind individuals through corneal transplantation."
+              },
+            ].map((item, i) => (
+              <div key={i} className={`relative bg-white ${item.border} border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group overflow-hidden`}>
+                <div className={`absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b ${item.color} group-hover:w-2 transition-all`} />
+                <div className={`${item.bg} h-11 w-11 rounded-2xl flex items-center justify-center mb-4`}>{item.icon}</div>
+                <h4 className="font-extrabold text-gray-900 text-[15px] mb-2">{item.title}</h4>
+                <p className="text-xs text-gray-600 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
